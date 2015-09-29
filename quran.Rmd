@@ -1,0 +1,72 @@
+---
+title: "R'ing with the Quran"
+output: html_document
+---
+#Introduction
+Let us use R with work with the original Arabic Quranic text. The objective of this tutorial is to get you on the road towards analyzing the Quranic text. 
+
+The first obstacle to anyone who wants to analyze Quran -as well as any Arabic text - is the ability to deal with the Arabic text. Here I will try to make this part easier for you.
+
+But, first let us get the Quranic text.
+
+#Getting raw Quran
+
+Go to http://tanzil.net/download/ and choose the right file. For this tutorial, I used "Simple Clean" without any pause marks or other options, and chose "Text(with aya numbers)", and saved it in a folder called "data". The file includes sura number followed by verse number followed by the actual text of the verse. The fields are separated by a bar "|" and has some copyright notes at the end. I had to manually remove the copyright notes before reading the file in R.
+
+
+```{r}
+q = read.csv("data/quran-simple-clean.txt", header=F, stringsAsFactor=F, encoding="UTF-8", sep="|")
+head(q)
+tail(q)
+```
+
+I hope you have the same output as mine. You might struggle to get R output correct Arabic characters as I did. I used Windows 7 and had to work with changing locale information from control panel.
+
+So, albeit some hiccups: congrats! you have the entire Quran in R!
+
+
+#Tidy up few things
+Let us see the structure of our Quran in R
+```{r}
+str(q)
+```
+
+Since our initial file did not have headings, R automatically named the three columns as V1, V2 and V3. We need to change column names:
+```{r}
+colnames(q) = c("sura", "aya", "text")
+
+```
+
+Thats better!
+
+With one shot lets us display the first verse in the first 10 suras
+```{r}
+q$text[q$aya==1 & q$sura<=10]
+
+```
+
+You would notice that Tanzil guys adopted the view that "بسم الله الرحمن الرحيم" is part of the first verse in all suras (expect sura no. 9)..
+
+For me, I wanted to exclude it from all suras except suras nos 1 and 9. How to do that? 
+```{r}
+q$text = gsub("^بسم الله الرحمن الرحيم ","",q$text)
+```
+
+Now we are ready to go!
+
+#Some Handy queries
+
+##Dispaly a sura
+So, let us display just a sura, say no. 100
+```{r}
+q[q$sura==100,]
+
+```
+
+##Search for a word
+Here is one way to see how may times and where are the words Muhammad (محمد) is mentioned in the Quran.
+```{r}
+q[which(grepl("محمد", q$text)),]
+
+```
+

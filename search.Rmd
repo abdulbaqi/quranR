@@ -1,0 +1,160 @@
+---
+title: "First steps in Text Mining the Quran"
+author: "Abdulbaqi Sharaf"
+date: "Wednesday, April 29, 2015"
+output: html_document
+---
+
+In the previous tutorial we created the data frame that hold the Arabic Quran called `q`
+```{r}
+str(q)
+
+```
+Now let us do some basic text mining works, motivated by the following document.
+http://onepager.togaware.com/TextMiningO.pdf
+
+#Text Mining Package
+
+I wanted to experiment a bit with the `tm` package. Please install and load the package.
+```{r}
+library(tm)
+
+```
+
+The first step is to create a corpus consisting of the raw Arabic verses as `VectorSource`
+```{r}
+qCorpus = Corpus(VectorSource(q$text))
+
+```
+
+Lets `inspect` the content of this Corpus
+```{r}
+inspect(qCorpus[1:5])
+
+```
+
+We will do some more annotation work using `meta` later. For now, let us create term document matrix
+```{r}
+qTerms = DocumentTermMatrix(qCorpus)
+qTerms
+```
+
+This produces a long matrix of documents (i.e., verses) against Quranic terms. Let us for example see a portion of this matrix by looking into documents 1 to 7 (i.e., sura Fateha) and terms say 1000 to 1005
+```{r}
+inspect(qTerms[1:7,1000:1005])
+
+```
+
+This tells us that none of these five terms appears in any of the first 7 documents. Sparsity is a known issue in document term matrices. 
+
+#Some operations of Document Term Matrics
+
+Lets us find some common terms in the Quran. What are terms used 100 or more times in the Quran?
+```{r}
+findFreqTerms(qTerms,100)
+
+```
+
+Interesting to see prophet Musa (Moses) "موسى" among the list.  
+Note that since we did not do any stemming root words are repeated with various affixes as different words. 
+
+Even we can create a list of most freq terms and store it in a data frame
+```{r}
+freq = sort(colSums(as.matrix(qTerms)),decreasing = T)
+head(freq, 10)
+wf = data.frame(word=names(freq), freq=freq)
+```
+
+
+Why not plot them using `ggplot2` package?
+```{r}
+library(ggplot2)
+#take the most freq in a separate data frame
+wfplot = subset(wf,freq>300)
+ggplot(wfplot, aes(word, freq)) +
+  geom_bar(stat="identity")+
+  theme(axis.text.x=element_text(angle=45, hjust = 1))
+```
+
+No Wonder, Allah الله is the most frequent word. May HE be exalted!
+
+#Word Cloud
+Now let us do some more cool visualization with Word Cloud using the package `wordcloud`.Please review the package and adjust various parameters to choose the right scale and color brewer and percentage of words to rotate.
+
+```{r}
+library(wordcloud)
+#I will set a seed so you can reproduce this result
+set.seed(114)
+wordcloud(names(freq), freq, min.freq=50, scale=c(5,.5),colors=brewer.pal(6,"Dark2"), rot.per=0.2)
+
+```
+
+Alayws the beatiful name ALLAH (الله) pops up in your face! Exalted be He.
+
+#Word Length
+
+We would like to know more about the word length in the Quran.
+
+First lets get all words in a data frame `words` and word length in `wLen`
+```{r}
+words = as.matrix(colnames(qTerms))
+wLen = data.frame(nletters=nchar(words))
+```
+
+Let us produce some visualization out of this.
+```{r}
+ggplot(wLen, aes(x=nletters))+
+  geom_histogram(binwidth=1) +
+  geom_vline(xintercept=mean(nchar(words)),
+             colour="green", size=1, alpha=.5)+
+  labs(x="Number of Letters", y="Number of Words")
+
+```
+
+This shows that on average word sizes are close to 5 letters. Remember we are not talking here about root words, rather raw words with all prefixes and suffixes.
+
+#Letter frequencies 
+
+Since we gone that far, let us conclude with analyzing the frequency of letters. First a number of packages need to be installed. 
+
+```{r}
+library(dplyr)
+library(stringr)
+library(qdap)
+letter = str_split(words,"")
+letter=sapply(letter, function(x) x[-1])
+letter = unlist(letter)
+letter = dist_tab(letter)
+```
+
+So, `letter` is a nice data frame that gives a list of letters with their frequency and cumulitive freq percentages. Let us produce a graph out of it
+```{r}
+letterMutate = mutate(letter,Letter=factor(letter$interval, levels=letter$interval[order(letter$freq)]))
+ggplot(letterMutate, aes(letterMutate$Letter, weight=percent)) +
+  geom_bar()+
+  coord_flip()+
+  ylab("Proportion")+
+  xlab("Letter")+
+  scale_y_continuous(breaks=seq(0,12,2),
+                     label=function(x) paste0(x,"%"),
+                     expand=c(0,0), limits=c(0,12))
+
+```
+
+#Position of letters in Quranic words
+
+```{r}
+words %>%
+  lapply(function(x) sapply(letters, gregexpr, x, fixed=T)) %>%
+  unlist %>%
+  (function(x) x[x!=-1]) %>%
+  (function(x) setNames(x, gsub("\\d", "", names(x)))) %>%
+  (function(x) apply(table(data.frame(letter=names(x),
+                           position=unname(x))),
+                      1, function(y) y/length(x)))%>%
+  qheat(high="green", low="yellow", by.column=NULL,
+        values=T, digits=3, plot=F)
+
+
+```
+
